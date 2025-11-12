@@ -21,15 +21,26 @@ OBJS = \
 	kernel_main.o \
 	rprintf.o \
 	interrupt.o \
-	page.o
+	page.o \
+	sd.o \
+	fat.o 
 # Make sure to keep a blank line here after OBJS list
 
 OBJ = $(patsubst %,$(ODIR)/%,$(OBJS))
+
+$(ODIR)/fat.o: fat.c
+	$(CC) $(CFLAGS) -c -g -o $@ $^
 
 $(ODIR)/%.o: $(SDIR)/%.c
 	$(CC) $(CFLAGS) -c -g -o $@ $^
 	
 $(ODIR)/%.o: $(SDIR)/%.s
+	$(CC) $(CFLAGS) -c -g -o $@ $^
+
+$(ODIR)/page.o: page.c
+	$(CC) $(CFLAGS) -c -g -o $@ $^
+
+$(ODIR)/sd.o: sd.c
 	$(CC) $(CFLAGS) -c -g -o $@ $^
 
 $(ODIR)/rprintf.o: rprintf.c
@@ -61,6 +72,22 @@ rootfs.img:
 	mmd -i rootfs.img@@1M boot 
 	mcopy -i rootfs.img@@1M grub.cfg ::/boot
 	@echo " -- BUILD COMPLETED SUCCESSFULLY --"
+disk.img:
+	dd if=/dev/zero of=disk.img bs=1M count=32
+	mformat -F -t 64 -h 16 -s 32 -i disk.img ::
+	mcopy -i disk.img kernel ::
+	echo "Hello from FAT filesystem!" > test_temp.txt
+	mcopy -i disk.img test_temp.txt ::TEST.TXT
+	rm -f test_temp.txt
+	mmd -i disk.img boot
+	mcopy -i disk.img grub.cfg ::boot/grub.cfg
+	$(GRUBLOC)grub-mkimage -p /boot -o grub.img -O i386-pc normal biosdisk multiboot multiboot2 configfile fat
+	dd if=$(BOOTIMG) of=disk.img conv=notrunc
+	dd if=grub.img of=disk.img conv=notrunc bs=512 seek=1
+	@echo " -- DISK.IMG BUILD COMPLETED --"
+
+rundisk: bin disk.img
+	qemu-system-x86_64 -hda disk.img
 
 run:
 	qemu-system-x86_64 -hda rootfs.img
@@ -72,3 +99,4 @@ debug:
 
 clean:
 	rm -f grub.img kernel rootfs.img obj/*
+
