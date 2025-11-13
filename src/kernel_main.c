@@ -5,6 +5,8 @@ const unsigned int multiboot_header[] __attribute__((section(".multiboot"))) = {
 #include "../rprintf.h"
 #include "../interrupt.h"
 #include "../page.h"
+#include "../sd.h"
+#include "../fat.h"
 
 // External symbols from linker script
 extern int _end_kernel;
@@ -66,7 +68,7 @@ void main() {
     asm("sti");   // Enable interrupts
     
     // Print welcome message
-    esp_printf(putc_wrapper, "CS310 Homework 4: Virtual Memory\r\n");
+    esp_printf(putc_wrapper, "CS310 Homework 5: Fat Fs Driver\r\n");
     esp_printf(putc_wrapper, "Interrupts enabled. Type to test keyboard input:\r\n");
     esp_printf(putc_wrapper, "\r\n");
     
@@ -121,6 +123,46 @@ if (pages != NULL) {
 }
 esp_printf(putc_wrapper, "\r\n");
     
+    
+esp_printf(putc_wrapper, "\r\n=== Testing FAT Filesystem ===\r\n");
+
+// Initialize SD card driver
+esp_printf(putc_wrapper, "Initializing SD card...\r\n");
+sd_init();
+
+// Initialize FAT filesystem
+esp_printf(putc_wrapper, "Initializing FAT filesystem...\r\n");
+if (fatInit() == 0) {
+    esp_printf(putc_wrapper, "FAT filesystem initialized successfully!\r\n");
+    
+    // Open test file
+    esp_printf(putc_wrapper, "\r\nOpening test.txt...\r\n");
+    int fd = fatOpen("test.txt");  // Changed from TEST.TXT to test.txt
+    
+    if (fd >= 0) {
+        esp_printf(putc_wrapper, "File opened successfully! fd=%d\r\n", fd);
+        
+        // Read file contents
+        char buffer[256];
+        int bytes_read = fatRead(fd, buffer, 255);
+        
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';  // Null terminate
+            esp_printf(putc_wrapper, "\r\n=== File contents ===\r\n");
+            esp_printf(putc_wrapper, "%s", buffer);
+            esp_printf(putc_wrapper, "\r\n=== End of file (%d bytes) ===\r\n", bytes_read);
+        } else {
+            esp_printf(putc_wrapper, "ERROR: Failed to read file\r\n");
+        }
+    } else {
+        esp_printf(putc_wrapper, "ERROR: Failed to open file\r\n");
+    }
+} else {
+    esp_printf(putc_wrapper, "ERROR: Failed to initialize FAT filesystem\r\n");
+}
+
+esp_printf(putc_wrapper, "\r\n=== FAT Test Complete ===\r\n\r\n");
+
     // Infinite loop - wait for keyboard interrupts
     while(1) {
         asm("hlt");  // Halt until next interrupt

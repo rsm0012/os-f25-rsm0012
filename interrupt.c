@@ -84,6 +84,11 @@ uint8_t inb (uint16_t _port) {
     return rv;
 }
 
+uint16_t inw(uint16_t port) {
+    uint16_t rv;
+    __asm__ __volatile__ ("inw %1, %0" : "=a" (rv) : "dN" (port));
+    return rv;
+}
 
 void memset(char *s, char c, unsigned int n) {
     for(int k = 0; k < n ; k++) {
